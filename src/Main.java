@@ -33,21 +33,23 @@ public class Main {
         while (true) {
             System.out.println("\n===== HOTEL BOOKING SYSTEM =====");
             System.out.println("1. View Guests");
-            System.out.println("2. Add Guest");
-            System.out.println("3. Update Booking Status");
-            System.out.println("4. Delete Guest");
-            System.out.println("5. Transaction: Create Booking + RoomAssignment");
-            System.out.println("6. Exit");
+            System.out.println("2. View Bookings");
+            System.out.println("3. Add Guest");
+            System.out.println("4. Update Booking Status");
+            System.out.println("5. Delete Guest");
+            System.out.println("6. Transaction: Create Booking + RoomAssignment");
+            System.out.println("7. Exit");
             System.out.print("Choose option: ");
 
             int choice = safeInt();
             switch (choice) {
                 case 1 -> viewGuests();
-                case 2 -> addGuest();
-                case 3 -> updateBookingStatus();
-                case 4 -> deleteGuest();
-                case 5 -> transactionalBookingFlow();
-                case 6 -> System.exit(0);
+                case 2 -> viewBookings();
+                case 3 -> addGuest();
+                case 4 -> updateBookingStatus();
+                case 5 -> deleteGuest();
+                case 6 -> transactionalBookingFlow();
+                case 7 -> System.exit(0);
                 default -> System.out.println("Invalid choice.");
             }
         }
@@ -75,6 +77,28 @@ public class Main {
             }
         } catch (SQLException e) {
             System.out.println("Error fetching guests.");
+        }
+    }
+
+    private static void viewBookings() {
+        try {
+            PreparedStatement ps = conn.prepareStatement(
+                    "SELECT BookingID, StartDate, EndDate, Status, GuestID FROM Booking"
+            );
+            ResultSet rs = ps.executeQuery();
+
+            System.out.println("\n=== BOOKINGS ===");
+            while (rs.next()) {
+                System.out.println(
+                        "BookingID: " + rs.getInt("BookingID") +
+                                " | GuestID: " + rs.getInt("GuestID") +
+                                " | " + rs.getString("StartDate") +
+                                " to " + rs.getString("EndDate") +
+                                " | Status: " + rs.getString("Status")
+                );
+            }
+        } catch (SQLException e) {
+            System.out.println("Error reading bookings: " + e.getMessage());
         }
     }
 
