@@ -1,5 +1,6 @@
 import java.sql.*;
 import java.io.FileInputStream;
+import java.time.LocalDate;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -173,8 +174,6 @@ public class Main {
 
     private static void transactionalBookingFlow() {
         try {
-            conn.setAutoCommit(false);
-
             System.out.print("Guest ID: ");
             int guest = safeInt();
 
@@ -183,6 +182,29 @@ public class Main {
 
             System.out.print("End Date (YYYY-MM-DD): ");
             String ed = sc.next();
+
+            System.out.print("Room ID: ");
+            int room = safeInt();
+
+            System.out.print("StayDate: ");
+            String stay = sc.next();
+
+
+            LocalDate start = LocalDate.parse(sd);
+            LocalDate end = LocalDate.parse(ed);
+            LocalDate stayDate = LocalDate.parse(stay);
+
+            if (!start.isBefore(end)) {
+                System.out.println("Error: StartDate must be before EndDate. Transaction aborted.");
+                return;
+            }
+
+            if (stayDate.isBefore(start) || stayDate.isAfter(end)) {
+                System.out.println("Error: StayDate must be within the booking period. Transaction aborted.");
+                return;
+            }
+
+            conn.setAutoCommit(false);
 
             // Insert booking
             PreparedStatement ps1 = conn.prepareStatement(
@@ -198,12 +220,7 @@ public class Main {
             keys.next();
             int newBookingID = keys.getInt(1);
 
-            // Assign room
-            System.out.print("Room ID: ");
-            int room = safeInt();
-            System.out.print("StayDate: ");
-            String stay = sc.next();
-
+            // Insert room assignment
             PreparedStatement ps2 = conn.prepareStatement(
                     "INSERT INTO RoomAssignment (StayDate, BookingID, RoomID) VALUES (?, ?, ?)"
             );
@@ -212,6 +229,7 @@ public class Main {
             ps2.setInt(3, room);
             ps2.executeUpdate();
 
+            // Commit all changes
             conn.commit();
             conn.setAutoCommit(true);
 
@@ -223,4 +241,5 @@ public class Main {
             System.out.println("Error: " + e.getMessage());
         }
     }
+
 }
