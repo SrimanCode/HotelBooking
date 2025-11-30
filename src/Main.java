@@ -1,3 +1,6 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.sql.*;
 import java.io.FileInputStream;
 import java.time.LocalDate;
@@ -17,6 +20,41 @@ public class Main {
         }
     }
 
+    public static void runSQLScript(Connection conn, String filePath) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(filePath));
+            StringBuilder sb = new StringBuilder();
+            String line;
+
+            Statement stmt = conn.createStatement();
+
+            while ((line = reader.readLine()) != null) {
+
+                line = line.replace("\uFEFF", "").trim();
+                if (line.isEmpty() || line.startsWith("--")) {
+                    continue;
+                }
+                sb.append(line).append(" ");
+                if (line.endsWith(";")) {
+                    String sql = sb.toString().trim();
+                    sql = sql.substring(0, sql.length() - 1);
+
+                    if (!sql.isBlank()) {
+                        stmt.execute(sql);
+                    }
+
+                    sb.setLength(0);
+                }
+            }
+            reader.close();
+            System.out.println("SQL script loaded successfully.");
+
+        } catch (Exception e) {
+            System.out.println("Error loading SQL script: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     private static void connect() throws Exception {
         Properties props = new Properties();
         props.load(new FileInputStream("src/app.properties"));
@@ -28,6 +66,7 @@ public class Main {
         conn = DriverManager.getConnection(url, user, password);
         conn.setAutoCommit(true);
         System.out.println("Connected to DB.");
+        runSQLScript(conn, "src/create_and_populate.sql");
     }
 
     private static void menuLoop() {
