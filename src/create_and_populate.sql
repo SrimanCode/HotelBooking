@@ -1,4 +1,4 @@
-USE CS_156A;
+USE cs157a2;
 
 DROP TABLE IF EXISTS RoomMaintenance;
 DROP TABLE IF EXISTS RoomAssignment;
@@ -88,6 +88,25 @@ AFTER INSERT ON Booking
 FOR EACH ROW
 INSERT INTO Invoice (Amount, IssueDate, PaymentStatus, BookingID)
 VALUES (0.00, CURDATE(), 'Unpaid', NEW.BookingID);
+
+-- View
+DROP VIEW IF EXISTS vw_booking_summary;
+CREATE VIEW vw_booking_summary AS
+SELECT
+  b.BookingID,
+  g.GuestID,
+  g.Name AS GuestName,
+  b.StartDate,
+  b.EndDate,
+  b.Status,
+  ra.StayDate,
+  ra.RoomID,
+  r.RoomType,
+  r.Price
+FROM Booking b
+JOIN Guest g ON g.GuestID = b.GuestID
+LEFT JOIN RoomAssignment ra ON ra.BookingID = b.BookingID
+LEFT JOIN Room r ON r.RoomID = ra.RoomID;
 
 -- Initial Data
 INSERT INTO Guest (Name, Email, Phone) VALUES

@@ -74,22 +74,26 @@ public class Main {
             System.out.println("\n===== HOTEL BOOKING SYSTEM =====");
             System.out.println("1. View Guests");
             System.out.println("2. View Bookings");
-            System.out.println("3. Add Guest");
-            System.out.println("4. Update Booking Status");
-            System.out.println("5. Delete Guest");
-            System.out.println("6. Transaction: Create Booking + RoomAssignment");
-            System.out.println("7. Exit");
+            System.out.println("3. View Rooms");
+            System.out.println("4. View Booking Summary (VIEW)");
+            System.out.println("5. Add Guest");
+            System.out.println("6. Update Booking Status");
+            System.out.println("7. Delete Guest");
+            System.out.println("8. Transaction: Create Booking + RoomAssignment");
+            System.out.println("9. Exit");
             System.out.print("Choose option: ");
 
             int choice = safeInt();
             switch (choice) {
                 case 1 -> viewGuests();
                 case 2 -> viewBookings();
-                case 3 -> addGuest();
-                case 4 -> updateBookingStatus();
-                case 5 -> deleteGuest();
-                case 6 -> transactionalBookingFlow();
-                case 7 -> System.exit(0);
+                case 3 -> viewRooms();
+                case 4 -> viewBookingSummary();
+                case 5 -> addGuest();
+                case 6 -> updateBookingStatus();
+                case 7 -> deleteGuest();
+                case 8 -> transactionalBookingFlow();
+                case 9 -> System.exit(0);
                 default -> System.out.println("Invalid choice.");
             }
         }
@@ -139,6 +143,54 @@ public class Main {
             }
         } catch (SQLException e) {
             System.out.println("Error reading bookings: " + e.getMessage());
+        }
+    }
+
+    private static void viewRooms() {
+        try {
+            PreparedStatement ps = conn.prepareStatement(
+                    "SELECT RoomID, RoomType, Price, Capacity FROM Room"
+            );
+            ResultSet rs = ps.executeQuery();
+
+            System.out.println("\n=== ROOMS ===");
+            while (rs.next()) {
+                System.out.println(
+                        rs.getInt("RoomID") + " | " +
+                                rs.getString("RoomType") + " | " +
+                                rs.getBigDecimal("Price") + " | " +
+                                rs.getInt("Capacity")
+                );
+            }
+        } catch (SQLException e) {
+            System.out.println("Error reading rooms: " + e.getMessage());
+        }
+    }
+
+    private static void viewBookingSummary() {
+        try {
+            PreparedStatement ps = conn.prepareStatement(
+                    "SELECT BookingID, GuestID, GuestName, StartDate, EndDate, Status, StayDate, RoomID, RoomType, Price FROM vw_booking_summary ORDER BY BookingID, StayDate"
+            );
+            ResultSet rs = ps.executeQuery();
+
+            System.out.println("\n=== BOOKING SUMMARY (VIEW) ===");
+            while (rs.next()) {
+                System.out.println(
+                        "BookingID: " + rs.getInt("BookingID") +
+                                " | GuestID: " + rs.getInt("GuestID") +
+                                " (" + rs.getString("GuestName") + ")" +
+                                " | " + rs.getString("StartDate") +
+                                " to " + rs.getString("EndDate") +
+                                " | Status: " + rs.getString("Status") +
+                                (rs.getString("StayDate") == null ? "" :
+                                        (" | StayDate: " + rs.getString("StayDate") +
+                                                " | RoomID: " + rs.getInt("RoomID") +
+                                                " (" + rs.getString("RoomType") + ")"))
+                );
+            }
+        } catch (SQLException e) {
+            System.out.println("Error reading booking summary: " + e.getMessage());
         }
     }
 
