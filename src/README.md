@@ -25,6 +25,7 @@ jdbc:mysql://localhost:3306/cs157a2?allowPublicKeyRetrieval=true&useSSL=false
 Before running the application, copy app.example.properties to app.properties 
 and fill in your own MySQL username and password. 
 Do not commit app.properties to GitHub.
+
 ---
 
 ## 2) Database Setup
