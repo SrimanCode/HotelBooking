@@ -132,3 +132,81 @@ INSERT INTO RoomAssignment (StayDate, BookingID, RoomID) VALUES
 INSERT INTO RoomMaintenance (RoomID, MaintenanceNo, Date, Description, StaffName) VALUES
 (1, 1, '2025-11-09', 'Deep clean', 'Chris'),
 (2, 1, '2025-11-10', 'HVAC check', 'Sam');
+
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS CreateBookingWithValidation$$
+
+CREATE PROCEDURE CreateBookingWithValidation (
+    IN p_GuestID INT,
+    IN p_StartDate DATE,
+    IN p_EndDate DATE,
+    IN p_RoomType VARCHAR(20)
+)
+BEGIN
+    DECLARE v_Day DATE;
+    DECLARE v_Counter INT DEFAULT 0;
+    DECLARE v_TotalDays INT;
+    DECLARE v_RoomID INT;
+    DECLARE v_TotalAmount DECIMAL(10,2);
+
+    -- Validate dates
+    IF p_EndDate <= p_StartDate THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'EndDate must be after StartDate';
+    END IF;
+
+    SET v_TotalDays = DATEDIFF(p_EndDate, p_StartDate);
+
+    -- Find an available room
+    SELECT r.RoomID 
+    INTO v_RoomID
+    FROM Room r
+    WHERE (p_RoomType IS NULL OR r.RoomType = p_RoomType)
+      AND NOT EXISTS (
+            SELECT 1
+            FROM RoomAssignment ra
+            WHERE ra.RoomID = r.RoomID
+              AND ra.StayDate BETWEEN p_StartDate AND DATE_SUB(p_EndDate, INTERVAL 1 DAY)
+        )
+      AND NOT EXISTS (
+            SELECT 1
+            FROM RoomMaintenance rm
+            WHERE rm.RoomID = r.RoomID
+              AND rm.Date BETWEEN p_StartDate AND DATE_SUB(p_EndDate, INTERVAL 1 DAY)
+        )
+    LIMIT 1;
+
+    -- If no room available, show error message
+    IF v_RoomID IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No available room for the selected dates';
+    END IF;
+
+    -- Create the booking
+    INSERT INTO Booking (StartDate, EndDate, GuestID, Status)
+    VALUES (p_StartDate, p_EndDate, p_GuestID, 'Confirmed');
+
+    SET @newBookingID = LAST_INSERT_ID();
+
+    -- Assign the room for each day
+    SET v_Counter = 0;
+    WHILE v_Counter < v_TotalDays DO
+        SET v_Day = DATE_ADD(p_StartDate, INTERVAL v_Counter DAY);
+        INSERT INTO RoomAssignment (StayDate, BookingID, RoomID)
+        VALUES (v_Day, @newBookingID, v_RoomID);
+        SET v_Counter = v_Counter + 1;
+    END WHILE;
+
+    -- Calculate total invoice amount
+    SELECT SUM(r.Price) INTO v_TotalAmount
+    FROM RoomAssignment ra
+    JOIN Room r ON ra.RoomID = r.RoomID
+    WHERE ra.BookingID = @newBookingID;
+
+    -- Update invoice
+    UPDATE Invoice
+    SET Amount = IFNULL(v_TotalAmount, 0)
+    WHERE BookingID = @newBookingID;
+
+END$$
+
+DELIMITER ;
