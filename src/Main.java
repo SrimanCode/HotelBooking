@@ -11,6 +11,75 @@ public class Main {
     private static Connection conn;
     private static Scanner sc = new Scanner(System.in);
 
+    //Helpers for input validation:
+    private static String readNonEmptyString(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String s = sc.nextLine().trim();
+            if (!s.isEmpty()) {
+                return s;
+            }
+            System.out.println("Input cannot be blank. Please try again.");
+        }
+    }
+    private static int readInt(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            if (sc.hasNextInt()) {
+                int value = sc.nextInt();
+                sc.nextLine();
+                return value;
+            } else {
+                System.out.println("Please enter a valid whole number.");
+                sc.nextLine();
+            }
+        }
+    }
+    private static String readEmail(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String email = sc.nextLine().trim();
+            if (email.isEmpty()) {
+                System.out.println("Email cannot be blank.");
+                continue;
+            }
+            if (!email.contains("@") || !email.contains(".")) {
+                System.out.println("Please enter a valid-looking email (must contain '@' and '.').");
+                continue;
+            }
+            return email;
+        }
+    }
+    private static String readOptionalString(String prompt) {
+        System.out.print(prompt);
+        return sc.nextLine().trim();
+    }
+    private static LocalDate readDate(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = sc.nextLine().trim();
+            try {
+                return LocalDate.parse(input); // expects YYYY-MM-DD
+            } catch (Exception e) {
+                System.out.println("Invalid date format. Please use YYYY-MM-DD (e.g., 2025-11-10).");
+            }
+        }
+    }
+    private static String readBookingStatus() {
+        String[] allowed = { "Pending", "Confirmed", "Checked-In", "Completed", "Cancelled" };
+        while (true) {
+            System.out.print("New Status (Pending/Confirmed/Checked-In/Completed/Cancelled): ");
+            String stat = sc.nextLine().trim();
+
+            for (String a : allowed) {
+                if (a.equalsIgnoreCase(stat)) {
+                    return a;
+                }
+            }
+            System.out.println("Invalid status. Please choose one of: Pending, Confirmed, Checked-In, Completed, Cancelled.");
+        }
+    }
+
     public static void main(String[] args) {
         try {
             connect();
@@ -81,9 +150,9 @@ public class Main {
             System.out.println("7. Delete Guest");
             System.out.println("8. Transaction: Create Booking + RoomAssignment");
             System.out.println("9. Exit");
-            System.out.print("Choose option: ");
+            //System.out.print("Choose option: ");
 
-            int choice = safeInt();
+            int choice = readInt("Choose option: ");
             switch (choice) {
                 case 1 -> viewGuests();
                 case 2 -> viewBookings();
@@ -195,13 +264,10 @@ public class Main {
     }
 
     private static void addGuest() {
-        sc.nextLine();
-        System.out.print("Name: ");
-        String name = sc.nextLine();
-        System.out.print("Email: ");
-        String email = sc.nextLine();
-        System.out.print("Phone: ");
-        String phone = sc.nextLine();
+        System.out.println("\n=== ADD NEW GUEST ===");
+        String name = readNonEmptyString("Name: ");
+        String email = readEmail("Email: ");
+        String phone = readOptionalString("Phone (optional, press Enter to skip): ");
 
         try {
             PreparedStatement ps = conn.prepareStatement(
@@ -209,23 +275,43 @@ public class Main {
             );
             ps.setString(1, name);
             ps.setString(2, email);
-            ps.setString(3, phone);
-            ps.executeUpdate();
+            if (phone.isEmpty()) {
+                ps.setNull(3, Types.VARCHAR);
+            } else {
+                ps.setString(3, phone);
+            }
 
-            System.out.println("Guest added.");
+            ps.executeUpdate();
+            System.out.println("Guest added successfully.");
+
+        } catch (SQLIntegrityConstraintViolationException e) {
+            // Unique constraint on Email most likely
+            System.out.println("Error: That email is already registered for another guest. Please use a different email.");
         } catch (SQLException e) {
-            System.out.println("Error: " + e.getMessage());
+            System.out.println("Database error while adding guest.");
+            System.out.println("Details: " + e.getMessage());
         }
     }
 
     private static void updateBookingStatus() {
-        System.out.print("Booking ID: ");
-        int id = safeInt();
-        sc.nextLine();
-        System.out.print("New Status (Pending/Confirmed/Cancelled): ");
-        String stat = sc.nextLine();
 
+        System.out.println("\n=== UPDATE BOOKING STATUS ===");
+        int id = readInt("Booking ID: ");
         try {
+            // Check that booking exists first
+            PreparedStatement check = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM Booking WHERE BookingID = ?"
+            );
+            check.setInt(1, id);
+            ResultSet rs = check.executeQuery();
+            rs.next();
+            if (rs.getInt(1) == 0) {
+                System.out.println("No booking found with ID " + id + ".");
+                return;
+            }
+
+            String stat = readBookingStatus();  // validated and normalized
+
             PreparedStatement ps = conn.prepareStatement(
                     "UPDATE Booking SET Status=? WHERE BookingID=?"
             );
@@ -233,104 +319,150 @@ public class Main {
             ps.setInt(2, id);
 
             int rows = ps.executeUpdate();
-            if (rows > 0)
-                System.out.println("Booking updated.");
-            else
-                System.out.println("Booking not found.");
+            if (rows > 0) {
+                System.out.println("Booking status updated to '" + stat + "'.");
+            } else {
+                System.out.println("Booking not found (no rows updated).");
+            }
 
         } catch (SQLException e) {
-            System.out.println("SQL Error: " + e.getMessage());
+            System.out.println("Database error while updating booking status.");
+            System.out.println("Details: " + e.getMessage());
         }
     }
 
     private static void deleteGuest() {
-        System.out.print("Guest ID: ");
-        int id = safeInt();
+        System.out.println("\n=== DELETE GUEST ===");
+        int id = readInt("Guest ID: ");
 
         try {
+            // Check existence first
+            PreparedStatement check = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM Guest WHERE GuestID = ?"
+            );
+            check.setInt(1, id);
+            ResultSet rs = check.executeQuery();
+            rs.next();
+            if (rs.getInt(1) == 0) {
+                System.out.println("No guest found with ID " + id + ".");
+                return;
+            }
+
             PreparedStatement ps = conn.prepareStatement(
                     "DELETE FROM Guest WHERE GuestID=?"
             );
             ps.setInt(1, id);
             int rows = ps.executeUpdate();
 
-            if (rows > 0)
-                System.out.println("Guest deleted.");
-            else
-                System.out.println("Guest not found.");
+            if (rows > 0) {
+                System.out.println("Guest (ID " + id + ") deleted successfully.");
+            } else {
+                System.out.println("Guest not deleted (no rows affected).");
+            }
+
         } catch (SQLException e) {
-            System.out.println("Error: Cannot delete guest. Likely has bookings.");
+            System.out.println("Error: Could not delete guest.");
+            System.out.println("Details: " + e.getMessage());
         }
     }
 
     private static void transactionalBookingFlow() {
+        System.out.println("\n=== TRANSACTION: NEW BOOKING + ROOM ASSIGNMENT ===");
+
         try {
-            System.out.print("Guest ID: ");
-            int guest = safeInt();
+            int guest = readInt("Guest ID: ");
 
-            System.out.print("Start Date (YYYY-MM-DD): ");
-            String sd = sc.next();
+            // Check guest exists
+            if (!existsById("Guest", "GuestID", guest)) {
+                System.out.println("No guest found with ID " + guest + ". Transaction aborted.");
+                return;
+            }
 
-            System.out.print("End Date (YYYY-MM-DD): ");
-            String ed = sc.next();
-
-            System.out.print("Room ID: ");
-            int room = safeInt();
-
-            System.out.print("StayDate: ");
-            String stay = sc.next();
-
-
-            LocalDate start = LocalDate.parse(sd);
-            LocalDate end = LocalDate.parse(ed);
-            LocalDate stayDate = LocalDate.parse(stay);
+            LocalDate start = readDate("Start Date (YYYY-MM-DD): ");
+            LocalDate end   = readDate("End Date (YYYY-MM-DD): ");
 
             if (!start.isBefore(end)) {
                 System.out.println("Error: StartDate must be before EndDate. Transaction aborted.");
                 return;
             }
 
+            int room = readInt("Room ID: ");
+            if (!existsById("Room", "RoomID", room)) {
+                System.out.println("No room found with ID " + room + ". Transaction aborted.");
+                return;
+            }
+
+            LocalDate stayDate = readDate("StayDate (YYYY-MM-DD, must be within booking period): ");
+
             if (stayDate.isBefore(start) || stayDate.isAfter(end)) {
                 System.out.println("Error: StayDate must be within the booking period. Transaction aborted.");
                 return;
             }
 
+            boolean oldAutoCommit = conn.getAutoCommit();
             conn.setAutoCommit(false);
 
-            // Insert booking
-            PreparedStatement ps1 = conn.prepareStatement(
-                    "INSERT INTO Booking (StartDate, EndDate, Status, GuestID) VALUES (?, ?, 'Confirmed', ?)",
-                    Statement.RETURN_GENERATED_KEYS
-            );
-            ps1.setString(1, sd);
-            ps1.setString(2, ed);
-            ps1.setInt(3, guest);
-            ps1.executeUpdate();
+            try {
+                // Insert booking
+                PreparedStatement ps1 = conn.prepareStatement(
+                        "INSERT INTO Booking (StartDate, EndDate, Status, GuestID) VALUES (?, ?, 'Confirmed', ?)",
+                        Statement.RETURN_GENERATED_KEYS
+                );
+                ps1.setDate(1, java.sql.Date.valueOf(start));
+                ps1.setDate(2, java.sql.Date.valueOf(end));
+                ps1.setInt(3, guest);
+                ps1.executeUpdate();
 
-            ResultSet keys = ps1.getGeneratedKeys();
-            keys.next();
-            int newBookingID = keys.getInt(1);
+                ResultSet keys = ps1.getGeneratedKeys();
+                keys.next();
+                int newBookingID = keys.getInt(1);
 
-            // Insert room assignment
-            PreparedStatement ps2 = conn.prepareStatement(
-                    "INSERT INTO RoomAssignment (StayDate, BookingID, RoomID) VALUES (?, ?, ?)"
-            );
-            ps2.setString(1, stay);
-            ps2.setInt(2, newBookingID);
-            ps2.setInt(3, room);
-            ps2.executeUpdate();
+                // Insert room assignment (may fail if violates uq_room_stay)
+                PreparedStatement ps2 = conn.prepareStatement(
+                        "INSERT INTO RoomAssignment (StayDate, BookingID, RoomID) VALUES (?, ?, ?)"
+                );
+                ps2.setDate(1, java.sql.Date.valueOf(stayDate));
+                ps2.setInt(2, newBookingID);
+                ps2.setInt(3, room);
+                ps2.executeUpdate();
 
-            // Commit all changes
-            conn.commit();
-            conn.setAutoCommit(true);
+                conn.commit();
+                System.out.println("Transaction successful! BookingID = " + newBookingID);
 
-            System.out.println("Transaction successful!");
+            } catch (SQLIntegrityConstraintViolationException e) {
+                // This will catch things like the UNIQUE(RoomID, StayDate) violation or FK issues
+                conn.rollback();
+
+                String msg = e.getMessage();
+                if (msg != null && msg.contains("uq_room_stay")) {
+                    System.out.println("Error: That room is already assigned on " + stayDate +
+                            ". Please choose a different room or date.");
+                } else {
+                    System.out.println("Transaction failed due to a constraint violation.");
+                    System.out.println("Details: " + e.getMessage());
+                }
+
+            } catch (SQLException e) {
+                conn.rollback();
+                System.out.println("Database error during transaction. Rolling back...");
+                System.out.println("Details: " + e.getMessage());
+            } finally {
+                conn.setAutoCommit(oldAutoCommit);
+            }
 
         } catch (SQLException e) {
-            System.out.println("Transaction failed! Rolling back...");
-            try { conn.rollback(); } catch (SQLException ex) {}
-            System.out.println("Error: " + e.getMessage());
+            System.out.println("Unexpected database error.");
+            System.out.println("Details: " + e.getMessage());
         }
     }
 
+    // helper to check if a row exists by ID
+    private static boolean existsById(String table, String idCol, int id) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM " + table + " WHERE " + idCol + " = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, id);
+        ResultSet rs = ps.executeQuery();
+        rs.next();
+        return rs.getInt(1) > 0;
+    }
 }

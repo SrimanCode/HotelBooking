@@ -27,6 +27,7 @@ CREATE TABLE Booking (
     EndDate DATE NOT NULL,
     Status ENUM('Pending', 'Confirmed', 'Checked-In', 'Completed', 'Cancelled') DEFAULT 'Pending',
     GuestID INT NOT NULL,
+    CONSTRAINT chk_booking_dates CHECK (StartDate < EndDate),
     CONSTRAINT fk_booking_guest
         FOREIGN KEY (GuestID) REFERENCES Guest(GuestID)
         ON DELETE CASCADE
@@ -50,6 +51,8 @@ CREATE TABLE RoomAssignment (
     StayDate DATE NOT NULL,
     BookingID INT NOT NULL,
     RoomID INT NOT NULL,
+    -- No double-sell: a given room can only be assigned once per date
+    CONSTRAINT uq_room_stay UNIQUE (RoomID, StayDate),
     CONSTRAINT fk_assignment_booking
         FOREIGN KEY (BookingID) REFERENCES Booking(BookingID)
         ON DELETE CASCADE
