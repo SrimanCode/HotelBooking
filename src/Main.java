@@ -135,7 +135,7 @@ public class Main {
         conn = DriverManager.getConnection(url, user, password);
         conn.setAutoCommit(true);
         System.out.println("Connected to DB.");
-        runSQLScript(conn, "src/create_and_populate.sql");
+        //runSQLScript(conn, "src/create_and_populate.sql");
     }
 
     private static void menuLoop() {
@@ -149,7 +149,8 @@ public class Main {
             System.out.println("6. Update Booking Status");
             System.out.println("7. Delete Guest");
             System.out.println("8. Transaction: Create Booking + RoomAssignment");
-            System.out.println("9. Exit");
+            System.out.println("9. Create Booking via Stored Procedure");
+            System.out.println("10. Exit");
             //System.out.print("Choose option: ");
 
             int choice = readInt("Choose option: ");
@@ -162,7 +163,8 @@ public class Main {
                 case 6 -> updateBookingStatus();
                 case 7 -> deleteGuest();
                 case 8 -> transactionalBookingFlow();
-                case 9 -> System.exit(0);
+                case 9 -> createBookingViaProcedure();   // NEW
+                case 10 -> System.exit(0);
                 default -> System.out.println("Invalid choice.");
             }
         }
@@ -452,6 +454,44 @@ public class Main {
 
         } catch (SQLException e) {
             System.out.println("Unexpected database error.");
+            System.out.println("Details: " + e.getMessage());
+        }
+    }
+
+    private static void createBookingViaProcedure() {
+        System.out.println("\n=== CREATE BOOKING VIA STORED PROCEDURE ===");
+        try {
+            int guestId = readInt("Guest ID: ");
+            if (!existsById("Guest", "GuestID", guestId)) {
+                System.out.println("No guest found with ID " + guestId + ".");
+                return;
+            }
+
+            LocalDate start = readDate("Start Date (YYYY-MM-DD): ");
+            LocalDate end   = readDate("End Date (YYYY-MM-DD): ");
+
+            String roomType = readOptionalString(
+                    "Room type (Single/Double/Suite/Deluxe/Family) or press Enter for any: ");
+            if (roomType.isBlank()) {
+                roomType = null;
+            }
+
+            CallableStatement cs = conn.prepareCall("{ CALL CreateBookingWithValidation(?, ?, ?, ?) }");
+            cs.setInt(1, guestId);
+            cs.setDate(2, java.sql.Date.valueOf(start));
+            cs.setDate(3, java.sql.Date.valueOf(end));
+            if (roomType == null) {
+                cs.setNull(4, Types.VARCHAR);
+            } else {
+                cs.setString(4, roomType);
+            }
+
+            cs.execute();
+            System.out.println("Stored procedure executed successfully (booking created and assigned).");
+
+        } catch (SQLException e) {
+            // Custom errors from SIGNAL in the procedure use SQLSTATE '45000'
+            System.out.println("Error while calling stored procedure.");
             System.out.println("Details: " + e.getMessage());
         }
     }

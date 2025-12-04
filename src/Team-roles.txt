@@ -1,5 +1,5 @@
-Sriman Ujhanthachhen: extablishing JDBC connection and
-Omar Yassin:
-Ryan Tran:
-Christina Vo:
-Xiaobin Zhu:
+Sriman Ujhanthachhen: establishing JDBC connection and writing good portion of Java functions
+Omar Yassin: testing and debugging of application, created another select function, created VIEW, populated README with necessary information
+Ryan Tran: Input validation and handling throughout the java code including writing helpers and ensuring misinputs would be aborted or prompt the user for a different input
+Christina Vo: Wrote a stored procedure to create hotel booking, checking room availability, room assignment, and calculate invoice
+Xiaobin Zhu: updated and organized the README, added clear instructions for handling the app.properties configuration, improved parts of the code structure, and helped make the overall project setup easy to run.
