@@ -32,7 +32,7 @@
 
 1. **Compile**
 
-   From the project root (`/Users/omary/HotelBooking`):
+   From the project root (differs for each user):
 
   
    mkdir -p out

@@ -151,7 +151,6 @@ public class Main {
             System.out.println("8. Transaction: Create Booking + RoomAssignment");
             System.out.println("9. Create Booking via Stored Procedure");
             System.out.println("10. Exit");
-            //System.out.print("Choose option: ");
 
             int choice = readInt("Choose option: ");
             switch (choice) {
